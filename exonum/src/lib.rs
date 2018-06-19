@@ -89,6 +89,6 @@ pub mod blockchain;
 pub mod explorer;
 pub mod api;
 
-mod events;
+pub mod events;
 #[cfg(test)]
 mod sandbox;
