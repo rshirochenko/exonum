@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use exonum::{
-    api::{self, ServiceApiBuilder, ServiceApiState}, blockchain::{self, BlockProof},
+    api::{self, ServiceApiBuilder, ServiceApiState, Error as ApiError}, blockchain::{self, BlockProof},
     crypto::{CryptoHash, Hash}, node::TransactionSend, storage::MapProof,
 };
 
@@ -37,6 +37,17 @@ pub struct TimestampProof {
     pub block_info: BlockProof,
     pub state_proof: MapProof<Hash, Hash>,
     pub timestamp_proof: MapProof<Hash, TimestampEntry>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FilenameQuery {
+    pub filename: String,
+}
+
+impl FilenameQuery {
+    pub fn new(filename: String) -> Self {
+        FilenameQuery { filename }
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -82,11 +93,32 @@ impl PublicApi {
         })
     }
 
+    pub fn handle_filename (
+        state: &ServiceApiState,
+        query: FilenameQuery,
+    ) -> api::Result<Option<TimestampEntry>> {
+        let snapshot = state.snapshot();
+        let schema = Schema::new(&snapshot);
+
+        // Get content hash by filename
+        let content_hash = match schema.timestamps_by_filename().get(&query.filename) {
+            Some(content_hash) => content_hash,
+            None => Err(ApiError::NotFound(format!(
+                "Content hash was not found by filename ({})",
+                &query.filename
+            )))?
+        };
+
+        // Get timestamp
+        Ok(schema.timestamps().get(&content_hash))
+    }
+
     pub fn wire(builder: &mut ServiceApiBuilder) {
         builder
             .public_scope()
             .endpoint("v1/timestamps/value", Self::handle_timestamp)
             .endpoint("v1/timestamps/proof", Self::handle_timestamp_proof)
+            .endpoint("v1/timestamps/filename", Self::handle_filename)
             .endpoint_mut("v1/timestamps", Self::handle_post_transaction);
     }
 }

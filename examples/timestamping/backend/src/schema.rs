@@ -14,7 +14,7 @@
 
 use chrono::{DateTime, Utc};
 use exonum::{
-    crypto::Hash, storage::{Fork, ProofMapIndex, Snapshot},
+    crypto::Hash, storage::{Fork, MapIndex, ProofMapIndex, Snapshot},
 };
 
 encoding_struct! {
@@ -25,6 +25,9 @@ encoding_struct! {
 
         /// Additional metadata.
         metadata: &str,
+
+        /// Filename
+        filename: &str,
     }
 }
 
@@ -62,6 +65,10 @@ where
         ProofMapIndex::new("timestamping.timestamps", &self.view)
     }
 
+    pub fn timestamps_by_filename(&self) -> MapIndex<&T, String, Hash> {
+        MapIndex::new("timestamping.timestamps_by_filename", &self.view)
+    }
+
     pub fn state_hash(&self) -> Vec<Hash> {
         vec![self.timestamps().merkle_root()]
     }
@@ -72,9 +79,14 @@ impl<'a> Schema<&'a mut Fork> {
         ProofMapIndex::new("timestamping.timestamps", &mut self.view)
     }
 
+    pub fn timestamps_by_filename_mut(&mut self) -> MapIndex<&mut Fork, String, Hash> {
+        MapIndex::new("timestamping.timestamps_by_filename", &mut self.view)
+    }
+
     pub fn add_timestamp(&mut self, timestamp_entry: TimestampEntry) {
         let timestamp = timestamp_entry.timestamp();
         let content_hash = timestamp.content_hash();
+        let filename = timestamp.filename().to_string();
 
         // Check that timestamp with given content_hash does not exist.
         if self.timestamps().contains(content_hash) {
@@ -83,5 +95,6 @@ impl<'a> Schema<&'a mut Fork> {
 
         // Add timestamp
         self.timestamps_mut().put(content_hash, timestamp_entry);
+        self.timestamps_by_filename_mut().put(&filename, *content_hash);
     }
 }
