@@ -20,6 +20,7 @@ members = [
     "test-suite/soak-tests",
 
     "runtimes/rust",
+    "runtimes/wasm",
 
     "components/api",
     "components/build",

@@ -254,6 +254,8 @@ pub enum RuntimeIdentifier {
     Rust = 0,
     /// Exonum Java Binding runtime.
     Java = 1,
+    /// Wasm runtime.
+    Wasm = 2,
 }
 
 impl From<RuntimeIdentifier> for u32 {
@@ -267,6 +269,7 @@ impl RuntimeIdentifier {
         match id {
             0 => Ok(Self::Rust),
             1 => Ok(Self::Java),
+            2 => Ok(Self::Wasm),
             _ => Err(()),
         }
     }
@@ -277,6 +280,7 @@ impl fmt::Display for RuntimeIdentifier {
         match self {
             Self::Rust => formatter.write_str("Rust runtime"),
             Self::Java => formatter.write_str("Java runtime"),
+            Self::Wasm => formatter.write_str("Wasm runtime"),
         }
     }
 }
