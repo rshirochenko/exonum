@@ -28,6 +28,41 @@ use std::{
 
 use exonum_rust_runtime::{DefaultInstance, RustRuntime, Service, ServiceFactory};
 
+#[derive(Debug, Serialize, Deserialize, BinaryValue)]
+#[binary_value(codec = "bincode")]
+pub struct DeployArtifact {
+    pub test_service_artifact: ArtifactId,
+    pub spec: Vec<u8>,
+}
+
+#[derive(Debug, Serialize, Deserialize, BinaryValue)]
+#[binary_value(codec = "bincode")]
+pub struct StartService {
+    pub spec: InstanceSpec,
+    pub constructor: Vec<u8>,
+}
+
+#[derive(Debug, Serialize, Deserialize, BinaryValue)]
+#[binary_value(codec = "bincode")]
+pub struct ResumeService {
+    pub instance_id: InstanceId,
+    pub params: Vec<u8>,
+}
+
+#[derive(Debug, Serialize, Deserialize, BinaryValue)]
+#[binary_value(codec = "bincode")]
+pub struct MigrateService {
+    pub instance_name: String,
+    pub artifact: ArtifactId,
+}
+
+#[derive(Debug, Serialize, Deserialize, BinaryValue)]
+#[binary_value(codec = "bincode")]
+pub struct CommitMigration {
+    pub instance_name: String,
+    pub migration_hash: Hash,
+}
+
 #[exonum_interface(auto_ids)]
 pub trait ToySupervisor<Ctx> {
     type Output;
@@ -56,6 +91,7 @@ impl ToySupervisor<ExecutionContext<'_>> for ToySupervisorService {
         mut context: ExecutionContext<'_>,
         request: DeployArtifact,
     ) -> Self::Output {
+        //dbg!("I am here");
         context
             .supervisor_extensions()
             .start_artifact_registration(&request.test_service_artifact, request.spec);

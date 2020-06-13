@@ -21,6 +21,7 @@ exonum-api = { version = "1.0.0", path = "../../components/api" }
 exonum-derive = { version = "1.0.0", path = "../../components/derive" }
 exonum-merkledb = { version = "1.0.0", path = "../../components/merkledb" }
 exonum-proto = { version = "1.0.0", path = "../../components/proto" }
+exonum-rust-runtime = { version = "1.0.0", path = "../rust"}
 
 actix-web = "2.0.0"
 futures = "0.3.4"

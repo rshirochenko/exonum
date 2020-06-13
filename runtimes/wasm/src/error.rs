@@ -27,4 +27,11 @@ pub enum Error {
     /// Unable to deploy artifact with the specified identifier, it is not listed
     /// among available artifacts.
     UnableToDeploy = 1,
+    /// Unknown transaction
+    UnknownTransaction = 2,
+    /// IncorrectCallInfo
+    IncorrectCallInfo = 3,
 }
+
+
+

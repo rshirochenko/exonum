@@ -333,6 +333,7 @@ pub use self::{
 
 pub mod api;
 pub mod spec;
+pub mod service;
 
 use exonum::{
     blockchain::{Blockchain, Schema as CoreSchema},
@@ -358,7 +359,6 @@ use self::api::ServiceApiBuilder;
 
 mod error;
 mod runtime_api;
-mod service;
 mod stubs;
 
 #[doc(hidden)]

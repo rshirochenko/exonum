@@ -137,39 +137,39 @@ fn proto_sources(
 /// Returns API builder instance with the appropriate endpoints for the specified
 /// Rust runtime instance.
 pub fn endpoints(runtime: &WasmRuntime) -> impl IntoIterator<Item = (String, ApiBuilder)> {
-    let artifact_proto_sources: HashMap<_, _> = runtime
-        .available_artifacts
-        .iter()
-        .map(|(artifact_id, service_factory)| {
-            (
-                artifact_id.clone(),
-                service_factory.artifact_protobuf_spec(),
-            )
-        })
-        .collect();
-    let exonum_sources = exonum_proto_sources();
-
-    // Cache filtered sources to avoid expensive operations in the endpoint handler.
-    let filtered_sources: HashMap<_, _> = artifact_proto_sources
-        .into_iter()
-        .map(|(artifact_id, sources)| {
-            let mut proto = sources.sources;
-            proto.extend(filter_exonum_proto_sources(
-                sources.includes,
-                &exonum_sources,
-            ));
-            (artifact_id, proto)
-        })
-        .collect();
+//    let artifact_proto_sources: HashMap<_, _> = runtime
+//        .available_artifacts
+//        .iter()
+//        .map(|(artifact_id, service_factory)| {
+//            (
+//                artifact_id.clone(),
+//                service_factory.artifact_protobuf_spec(),
+//            )
+//        })
+//        .collect();
+//    let exonum_sources = exonum_proto_sources();
+//
+//    // Cache filtered sources to avoid expensive operations in the endpoint handler.
+//    let filtered_sources: HashMap<_, _> = artifact_proto_sources
+//        .into_iter()
+//        .map(|(artifact_id, sources)| {
+//            let mut proto = sources.sources;
+//            proto.extend(filter_exonum_proto_sources(
+//                sources.includes,
+//                &exonum_sources,
+//            ));
+//            (artifact_id, proto)
+//        })
+//        .collect();
 
     let mut builder = ApiBuilder::new();
-    builder
-        .public_scope()
-        // This endpoint returns list of protobuf source files of the specified artifact,
-        // otherwise it returns source files of Exonum itself.
-        .endpoint("proto-sources", move |query| {
-            future::ready(proto_sources(&exonum_sources, &filtered_sources, query))
-        });
+//    builder
+//        .public_scope()
+//        // This endpoint returns list of protobuf source files of the specified artifact,
+//        // otherwise it returns source files of Exonum itself.
+//        .endpoint("proto-sources", move |query| {
+//            future::ready(proto_sources(&exonum_sources, &filtered_sources, query))
+//        });
 
     iter::once((["runtimes/", WasmRuntime::NAME].concat(), builder))
 }

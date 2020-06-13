@@ -3,19 +3,14 @@ pub use exonum::runtime::ExecutionContext;
 pub use self::{
     error::Error,
     runtime_api::{ArtifactProtobufSpec, ProtoSourceFile, ProtoSourcesQuery},
-    service::{
-        AfterCommitContext, Broadcaster, DefaultInstance, Service, ServiceDispatcher,
-        ServiceFactory,
-    },
+    service::CounterService,
 };
 
 use exonum::{
-    blockchain::{Blockchain, Schema as CoreSchema},
-    helpers::Height,
-    merkledb::Snapshot,
+    blockchain::Blockchain,
+    merkledb::{BinaryValue, Snapshot},
     runtime::{
-        catch_panic,
-        migrations::{InitMigrationError, MigrateData, MigrationScript},
+        migrations::{InitMigrationError, MigrationScript},
         oneshot::Receiver,
         versioning::Version,
         ArtifactId, ExecutionError, ExecutionFail, InstanceDescriptor, InstanceId, InstanceSpec,
@@ -33,7 +28,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 
 mod error;
 mod runtime_api;
-mod service;
+pub mod service;
 
 #[doc(hidden)]
 pub mod _reexports {
@@ -44,39 +39,39 @@ pub mod _reexports {
     };
 }
 
-/// Wrapper around a service factory that does not support migrations.
-#[derive(Debug)]
-struct WithoutMigrations<T>(T);
-
-impl<T: ServiceFactory> ServiceFactory for WithoutMigrations<T> {
-    fn artifact_id(&self) -> ArtifactId {
-        self.0.artifact_id()
-    }
-
-    fn artifact_protobuf_spec(&self) -> ArtifactProtobufSpec {
-        self.0.artifact_protobuf_spec()
-    }
-
-    fn create_instance(&self) -> Box<dyn Service> {
-        self.0.create_instance()
-    }
-}
-
-impl<T> MigrateData for WithoutMigrations<T> {
-    fn migration_scripts(
-        &self,
-        _start_version: &Version,
-    ) -> Result<Vec<MigrationScript>, InitMigrationError> {
-        Err(InitMigrationError::NotSupported)
-    }
-}
+///// Wrapper around a service factory that does not support migrations.
+//#[derive(Debug)]
+//struct WithoutMigrations<T>(T);
+//
+//impl<T: ServiceFactory> ServiceFactory for WithoutMigrations<T> {
+//    fn artifact_id(&self) -> ArtifactId {
+//        self.0.artifact_id()
+//    }
+//
+//    fn artifact_protobuf_spec(&self) -> ArtifactProtobufSpec {
+//        self.0.artifact_protobuf_spec()
+//    }
+//
+//    fn create_instance(&self) -> Box<dyn Service> {
+//        self.0.create_instance()
+//    }
+//}
+//
+//impl<T> MigrateData for WithoutMigrations<T> {
+//    fn migration_scripts(
+//        &self,
+//        _start_version: &Version,
+//    ) -> Result<Vec<MigrationScript>, InitMigrationError> {
+//        Err(InitMigrationError::NotSupported)
+//    }
+//}
 
 /// Wasm runtime entity.
 #[derive(Debug)]
 pub struct WasmRuntime {
     blockchain: Option<Blockchain>,
     api_notifier: mpsc::Sender<UpdateEndpoints>,
-    available_artifacts: HashMap<ArtifactId, Box<dyn ServiceFactory>>,
+    available_artifacts: HashMap<ArtifactId, CounterService>,
     deployed_artifacts: HashSet<ArtifactId>,
     started_services: BTreeMap<InstanceId, Instance>,
     started_services_by_name: HashMap<String, InstanceId>,
@@ -86,14 +81,14 @@ pub struct WasmRuntime {
 /// Builder of the `WasmRuntime`
 #[derive(Debug, Default)]
 pub struct WasmRuntimeBuilder {
-    available_artifacts: HashMap<ArtifactId, Box<dyn ServiceFactory>>,
+    available_artifacts: HashMap<ArtifactId, CounterService>,
 }
 
 #[derive(Debug)]
 struct Instance {
     id: InstanceId,
     name: String,
-    service: Box<dyn Service>,
+    service: CounterService,
     artifact_id: ArtifactId,
 }
 
@@ -101,18 +96,26 @@ impl Instance {
     fn descriptor(&self) -> InstanceDescriptor { InstanceDescriptor::new(self.id, &self.name) }
 }
 
-impl AsRef<dyn Service> for Instance {
-    fn as_ref(&self) -> &dyn Service { self.service.as_ref()}
-}
+//impl AsRef<dyn Service> for Instance {
+//    fn as_ref(&self) -> &dyn Service { self.service.as_ref()}
+//}
 
 impl WasmRuntimeBuilder {
     pub fn new() -> Self { Self::default() }
 
-    pub fn with_factory<S: ServiceFactory>(mut self, service_factory: S) -> Self {
-        let artifact = service_factory.artifact_id();
-        let service_factory = WithoutMigrations(service_factory);
+//    pub fn with_factory<S: ServiceFactory>(mut self, service_factory: S) -> Self {
+//        let artifact = service_factory.artifact_id();
+//        let service_factory = WithoutMigrations(service_factory);
+//        self.available_artifacts
+//            .insert(artifact, Box::new(service_factory));
+//        self
+//    }
+
+    pub fn with_factory(mut self, artifact_name: &str) -> Self {
+        let version = Version::new(1,1, 1);
+        let runtime_id = RuntimeIdentifier::Wasm as u32;
         self.available_artifacts
-            .insert(artifact, Box::new(service_factory));
+            .insert(ArtifactId::new(runtime_id, artifact_name.to_string(), version).unwrap(), CounterService::default());
         self
     }
 
@@ -132,7 +135,7 @@ impl WasmRuntimeBuilder {
 }
 
 impl WasmRuntime {
-    pub const NAME: &'static str = "rust";
+    pub const NAME: &'static str = "wasm";
 
     pub fn builder() -> WasmRuntimeBuilder{ WasmRuntimeBuilder::new() }
 
@@ -197,20 +200,43 @@ impl WasmRuntime {
         artifact: &ArtifactId,
         instance: &InstanceDescriptor,
     ) -> Result<Instance, ExecutionError> {
-        let factory = self.available_artifacts.get(artifact).unwrap_or_else(|| {
+        let service = self.available_artifacts.get(artifact).unwrap_or_else(|| {
             panic!(
                 "BUG: Core requested service instance start ({}) of not deployed artifact {}",
                 instance.name, artifact
             );
-        });
+        }).clone();
 
-        let service = factory.create_instance();
         Ok(Instance {
             id: instance.id,
             name: instance.name.to_owned(),
             service,
             artifact_id: artifact.to_owned(),
         })
+    }
+
+    fn new_service_if_needed(
+        &self,
+        artifact: &ArtifactId,
+        descriptor: &InstanceDescriptor,
+    ) -> Result<Option<Instance>, ExecutionError> {
+        if let Some(instance) = self.started_services.get(&descriptor.id) {
+            assert!(
+                instance.artifact_id == *artifact || artifact.is_upgrade_of(&instance.artifact_id),
+                "Mismatch between the requested artifact and the artifact associated \
+                 with the running service {}. This is either a bug in the lifecycle \
+                 workflow in the core, or this version of the Rust runtime is outdated \
+                 compared to the core.",
+                descriptor
+            );
+
+            if instance.artifact_id == *artifact {
+                // We just continue running the existing service since we've just checked
+                // that it corresponds to the same artifact.
+                return Ok(None);
+            }
+        }
+        Some(self.new_service(artifact, descriptor)).transpose()
     }
 
     fn artifacts_to_pretty_string(&self) -> String {
@@ -270,9 +296,12 @@ impl Runtime for WasmRuntime {
         artifact: &ArtifactId,
         parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
-        let instance = self.new_service(artifact, context.instance())?;
-        let service = instance.as_ref();
-        catch_panic(|| service.initialize(context, parameters))
+        println!(
+            "Wasm service Initializing service artifact - {}: context.instance - {}",
+            artifact,
+            context.instance()
+        );
+        Ok(())
     }
 
     fn initiate_resuming_service(
@@ -285,7 +314,39 @@ impl Runtime for WasmRuntime {
     }
 
     fn update_service_status(&mut self, _snapshot: &dyn Snapshot, state: &InstanceState) {
-        unimplemented!()
+        const CANNOT_INSTANTIATE_SERVICE: &str =
+            "BUG: Attempt to create a new service instance failed; \
+             within `instantiate_adding_service` we were able to create a new instance, \
+             but now we are not.";
+
+        let status = state
+            .status
+            .as_ref()
+            .expect("Rust runtime does not support removing service status");
+        Self::assert_known_status(status);
+
+        let mut service_api_changed = false;
+        let switch_off = if status.provides_read_access() {
+            if let Some(artifact) = state.associated_artifact() {
+                // Instantiate the service if necessary.
+                let maybe_instance = self
+                    .new_service_if_needed(artifact, &state.spec.as_descriptor())
+                    .expect(CANNOT_INSTANTIATE_SERVICE);
+                if let Some(instance) = maybe_instance {
+                    self.add_started_service(instance);
+                    // The service API has changed even if it was previously instantiated
+                    // (in the latter case, the instantiated version is outdated).
+                    service_api_changed = true;
+                }
+                false
+            } else {
+                // Service is no longer associated with an artifact; its API needs switching off.
+                true
+            }
+        } else {
+            // Service status (e.g., `Stopped`) requires switching the API off.
+            true
+        };
     }
 
     fn migrate(
@@ -305,8 +366,44 @@ impl Runtime for WasmRuntime {
         let instance = self
             .started_services
             .get(&context.instance().id)
-            .expect("BUG: an attempt to execute transaction of unknown service.");
-        catch_panic(|| instance.as_ref().call(context, method_id, payload))
+            .ok_or(Error::IncorrectCallInfo)?;
+        let service = &instance.service;
+
+        println!(
+            "Executing method {}#{} of service {}",
+            context.interface_name(),
+            method_id,
+            context.instance().id
+        );
+
+        const SERVICE_INTERFACE: &str = "";
+        match (context.interface_name(), method_id) {
+            // Increment counter.
+            (SERVICE_INTERFACE, 0) => {
+                let counter = service.counter.get();
+                let value = u64::from_bytes(payload.into())
+                    .map_err(|e| Error::UnknownTransaction.with_description(e))?;
+                println!("Updating counter value to {}", counter + value);
+                service.counter.set(counter + value);
+                Ok(())
+            }
+
+            // Reset counter.
+            (SERVICE_INTERFACE, 1) => {
+                println!("Resetting counter");
+                service.counter.set(0 as u64);
+                Ok(())
+            }
+
+            // Unknown transaction.
+            (interface, method) => {
+                let err = Error::UnknownTransaction.with_description(format!(
+                    "Incorrect information to call transaction. {}#{}",
+                    interface, method
+                ));
+                Err(err)
+            }
+        }
     }
 
     fn before_transactions(&self, context: ExecutionContext<'_>) -> Result<(), ExecutionError> {

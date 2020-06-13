@@ -13,7 +13,6 @@
 // limitations under the License.
 
 //! A collection of helpers for testing Rust runtime.
-
 use exonum::{
     blockchain::{
         config::{GenesisConfigBuilder, InstanceInitParams},
@@ -42,7 +41,8 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use exonum_wasm_runtime::{DefaultInstance, WasmRuntime, Service, ServiceFactory};
+use exonum_wasm_runtime::{WasmRuntime};
+use exonum_rust_runtime::RustRuntime;
 
 pub fn execute_transaction(
     blockchain: &mut BlockchainMut,
@@ -177,10 +177,12 @@ impl<T: Runtime> Runtime for Inspected<T> {
         test_service_artifact: ArtifactId,
         deploy_spec: Vec<u8>,
     ) -> oneshot::Receiver {
+        //dbg!("I am here2 {}", &self.runtime);
         self.events.push(RuntimeEvent::DeployArtifact(
             test_service_artifact.clone(),
             deploy_spec.clone(),
         ));
+        //dbg!("events {}", &self.events);
         self.runtime
             .deploy_artifact(test_service_artifact, deploy_spec)
     }
@@ -293,4 +295,8 @@ impl<T: Runtime> Runtime for Inspected<T> {
 
 impl WellKnownRuntime for Inspected<WasmRuntime> {
     const ID: u32 = WasmRuntime::ID;
+}
+
+impl WellKnownRuntime for Inspected<RustRuntime> {
+    const ID: u32 = RustRuntime::ID;
 }
