@@ -189,7 +189,7 @@ fn basic_runtime_workflow() {
 
     // Execute transaction with reset counter .
     let method_id = 1;
-    let tx = AnyTx::new(CallInfo::new(test_instance.instance_spec.id, method_id), vec![]);
+    let tx = AnyTx::new(CallInfo::new(test_instance.instance_spec.id, method_id), 10_u64.into_bytes());
     execute_transaction(
         &mut blockchain,
         tx.sign_with_keypair(&keypair),

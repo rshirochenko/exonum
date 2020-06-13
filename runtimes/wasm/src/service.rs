@@ -4,9 +4,12 @@ use exonum::blockchain::config::InstanceInitParams;
 use exonum::{
     runtime::{versioning::Version, ArtifactId, InstanceId, RuntimeIdentifier},
 };
-use wasmer_runtime::{imports, instantiate};
+use wasmer_runtime::{imports, Instance as WasmInstance};
 
-pub const MODULES_PATH: &'static str = "wasm-services";
+use std::fs;
+use exonum::runtime::ExecutionError;
+
+pub const MODULES_PATH: &'static str = "/Users/roman/Documents/exonum/exonum/runtimes/wasm/src/wasm-services";
 
 /// Service instance with a counter.
 #[derive(Debug, Default, Clone)]
@@ -18,19 +21,24 @@ pub struct CounterService {
 #[derive(Debug, Default, Clone)]
 pub struct WasmService {
     pub name: String,
-    pub module: WasmModule,
+    pub wasm_bytes: Vec<u8>,
 }
 
 impl WasmService {
-    pub fn new(name: &str) -> Self {
-        let module_path = format!("{}/{}.wasm", MODULES_PATH, name);
-        let wasm_bytes = include_bytes!(module_path);
+    pub fn new(name: &str) -> Result<Self, std::io::Error> {
+        let module_path = format!("{}/counter_service.wasm", MODULES_PATH);
+        let wasm_bytes = fs::read(module_path)?;
         let import_object = imports! {};
-        let instance = instantiate(wasm_bytes, &import_object)?;
-        Self {
-            name: name.to_string,
-            module: instance,
-        }
+        Ok(Self {
+            name: name.to_string(),
+            wasm_bytes: wasm_bytes,
+        })
+    }
+
+    pub fn instantiate(&self) -> WasmInstance {
+        let import_object = imports! {};
+        let instance = wasmer_runtime::instantiate(&self.wasm_bytes, &import_object).unwrap();
+        instance
     }
 }
 

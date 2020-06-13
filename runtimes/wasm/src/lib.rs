@@ -3,7 +3,7 @@ pub use exonum::runtime::ExecutionContext;
 pub use self::{
     error::Error,
     runtime_api::{ArtifactProtobufSpec, ProtoSourceFile, ProtoSourcesQuery},
-    service::CounterService,
+    service::{CounterService, WasmService},
 };
 
 use exonum::{
@@ -21,6 +21,7 @@ use exonum::{
 use exonum_api::{ApiBuilder, UpdateEndpoints};
 use futures::{channel::mpsc, executor, SinkExt};
 use log::trace;
+use wasmer_runtime::Func;
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
@@ -44,7 +45,7 @@ pub mod _reexports {
 pub struct WasmRuntime {
     blockchain: Option<Blockchain>,
     api_notifier: mpsc::Sender<UpdateEndpoints>,
-    available_artifacts: HashMap<ArtifactId, CounterService>,
+    available_artifacts: HashMap<ArtifactId, WasmService>,
     deployed_artifacts: HashSet<ArtifactId>,
     started_services: BTreeMap<InstanceId, Instance>,
     started_services_by_name: HashMap<String, InstanceId>,
@@ -54,14 +55,14 @@ pub struct WasmRuntime {
 /// Builder of the `WasmRuntime`
 #[derive(Debug, Default)]
 pub struct WasmRuntimeBuilder {
-    available_artifacts: HashMap<ArtifactId, CounterService>,
+    available_artifacts: HashMap<ArtifactId, WasmService>,
 }
 
 #[derive(Debug)]
 struct Instance {
     id: InstanceId,
     name: String,
-    service: CounterService,
+    service: WasmService,
     artifact_id: ArtifactId,
 }
 
@@ -76,19 +77,11 @@ impl Instance {
 impl WasmRuntimeBuilder {
     pub fn new() -> Self { Self::default() }
 
-//    pub fn with_factory<S: ServiceFactory>(mut self, service_factory: S) -> Self {
-//        let artifact = service_factory.artifact_id();
-//        let service_factory = WithoutMigrations(service_factory);
-//        self.available_artifacts
-//            .insert(artifact, Box::new(service_factory));
-//        self
-//    }
-
     pub fn with_factory(mut self, artifact_name: &str) -> Self {
         let version = Version::new(1,1, 1);
         let runtime_id = RuntimeIdentifier::Wasm as u32;
         self.available_artifacts
-            .insert(ArtifactId::new(runtime_id, artifact_name.to_string(), version).unwrap(), CounterService::default());
+            .insert(ArtifactId::new(runtime_id, artifact_name.to_string(), version).unwrap(), WasmService::new("counter-service").unwrap());
         self
     }
 
@@ -353,18 +346,25 @@ impl Runtime for WasmRuntime {
         match (context.interface_name(), method_id) {
             // Increment counter.
             (SERVICE_INTERFACE, 0) => {
-                let counter = service.counter.get();
                 let value = u64::from_bytes(payload.into())
                     .map_err(|e| Error::UnknownTransaction.with_description(e))?;
-                println!("Updating counter value to {}", counter + value);
-                service.counter.set(counter + value);
+                let instance = service.instantiate();
+                let add_one: Func<u32, u32> = instance.func("add_one").unwrap();
+                let result = add_one.call(value as u32).unwrap();
+                println!("Updating counter value to {}", result);
+                //service.counter.set(counter + value);
                 Ok(())
             }
 
             // Reset counter.
             (SERVICE_INTERFACE, 1) => {
                 println!("Resetting counter");
-                service.counter.set(0 as u64);
+                let value = u64::from_bytes(payload.into())
+                    .map_err(|e| Error::UnknownTransaction.with_description(e))?;
+                let instance = service.instantiate();
+                let add_one: Func<u32, u32> = instance.func("multiply_2").unwrap();
+                let result = add_one.call(value as u32).unwrap();
+                println!("Counter multiply result {}", result);
                 Ok(())
             }
 
