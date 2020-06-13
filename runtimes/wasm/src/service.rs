@@ -4,11 +4,34 @@ use exonum::blockchain::config::InstanceInitParams;
 use exonum::{
     runtime::{versioning::Version, ArtifactId, InstanceId, RuntimeIdentifier},
 };
+use wasmer_runtime::{imports, instantiate};
+
+pub const MODULES_PATH: &'static str = "wasm-services";
+
 /// Service instance with a counter.
 #[derive(Debug, Default, Clone)]
 pub struct CounterService {
     pub counter: Cell<u64>,
     pub name: String,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct WasmService {
+    pub name: String,
+    pub module: WasmModule,
+}
+
+impl WasmService {
+    pub fn new(name: &str) -> Self {
+        let module_path = format!("{}/{}.wasm", MODULES_PATH, name);
+        let wasm_bytes = include_bytes!(module_path);
+        let import_object = imports! {};
+        let instance = instantiate(wasm_bytes, &import_object)?;
+        Self {
+            name: name.to_string,
+            module: instance,
+        }
+    }
 }
 
 pub struct CounterServiceImpl;

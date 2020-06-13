@@ -21,6 +21,7 @@ members = [
 
     "runtimes/rust",
     "runtimes/wasm",
+    "runtimes/wasm-services/counter",
 
     "components/api",
     "components/build",

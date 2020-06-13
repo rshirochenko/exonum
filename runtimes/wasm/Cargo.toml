@@ -30,6 +30,7 @@ protobuf = "2.14.0"
 serde = "1.0.101"
 serde_derive = "1.0.101"
 tokio = "0.2.11"
+wasmer-runtime = "0.13.1"
 
 [dev-dependencies]
 anyhow = "1.0.26"

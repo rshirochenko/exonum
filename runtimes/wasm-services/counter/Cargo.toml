@@ -1,0 +1,16 @@
+[package]
+name = "wasm-counter-service"
+version = "1.0.0"
+edition = "2018"
+authors = ["The Exonum Team <contact@exonum.com>"]
+homepage = "https://exonum.com/"
+readme = "README.md"
+license = "Apache-2.0"
+keywords = ["exonum", "runtime"]
+categories = ["cryptography"]
+description = "Example counter service for WASM runtime."
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]

@@ -39,33 +39,6 @@ pub mod _reexports {
     };
 }
 
-///// Wrapper around a service factory that does not support migrations.
-//#[derive(Debug)]
-//struct WithoutMigrations<T>(T);
-//
-//impl<T: ServiceFactory> ServiceFactory for WithoutMigrations<T> {
-//    fn artifact_id(&self) -> ArtifactId {
-//        self.0.artifact_id()
-//    }
-//
-//    fn artifact_protobuf_spec(&self) -> ArtifactProtobufSpec {
-//        self.0.artifact_protobuf_spec()
-//    }
-//
-//    fn create_instance(&self) -> Box<dyn Service> {
-//        self.0.create_instance()
-//    }
-//}
-//
-//impl<T> MigrateData for WithoutMigrations<T> {
-//    fn migration_scripts(
-//        &self,
-//        _start_version: &Version,
-//    ) -> Result<Vec<MigrationScript>, InitMigrationError> {
-//        Err(InitMigrationError::NotSupported)
-//    }
-//}
-
 /// Wasm runtime entity.
 #[derive(Debug)]
 pub struct WasmRuntime {
