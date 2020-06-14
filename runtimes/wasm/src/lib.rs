@@ -362,9 +362,9 @@ impl Runtime for WasmRuntime {
                 let value = u64::from_bytes(payload.into())
                     .map_err(|e| Error::UnknownTransaction.with_description(e))?;
                 let instance = service.instantiate();
-                let add_one: Func<u32, u32> = instance.func("multiply_2").unwrap();
-                let result = add_one.call(value as u32).unwrap();
-                println!("Counter multiply result {}", result);
+                let add_one: Func<(u32, u32), u32> = instance.func("increment_counter").unwrap();
+                let result = add_one.call(value as u32, 10 as u32).unwrap();
+                println!("Host function exposed result {}", result);
                 Ok(())
             }
 
