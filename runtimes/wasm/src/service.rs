@@ -7,8 +7,16 @@ use exonum::{
 };
 use wasmer_runtime::{imports, Instance as WasmInstance, func, ImportObject};
 
+use std::collections::HashMap;
 use std::fs;
 use std::{cell::RefCell, sync::Arc};
+
+use crate::vm::{
+    error::{VMError, VMLogicError},
+    logic::{ReturnData, VMLogic},
+    imports,
+    memory::WasmerMemory,
+};
 
 pub const MODULES_PATH: &'static str = "/Users/roman/Documents/exonum/exonum/target/wasm32-unknown-unknown/debug";
 
@@ -50,6 +58,36 @@ impl WasmService {
             "host" => {
                 "add_to_counter" => func!(add_to_counter),
             },
+        }
+    }
+
+    pub fn run(&self, method_name: &[u8]) -> (Option<ReturnData>, Option<VMError>) {
+        let mut memory = match WasmerMemory::new(
+            10 as u32,
+            10 as u32,
+        ) {
+            Ok(x) => x,
+            Err(_err) => panic!("Cannot create memory for a contract call"),
+        };
+        let memory_copy = memory.clone();
+
+        let mut logic = VMLogic::new(&mut memory);
+
+        //let import_object = imports::build(memory_copy, &mut logic);
+
+        let method_name = match std::str::from_utf8(method_name) {
+            Ok(x) => x,
+            Err(_) => panic!("cannot parse method name"),
+        };
+
+        let import_object = self.form_import_objects();
+
+        match wasmer_runtime::instantiate(&self.wasm_bytes, &import_object) {
+            Ok(instance) => match instance.call(&method_name, &[]) {
+                Ok(_) => (Some(logic.outcome()), None),
+                Err(err) => (None, Some(VMError::FunctionCallError)),
+            },
+            Err(err) => panic!("wasm execution error"),
         }
     }
 }

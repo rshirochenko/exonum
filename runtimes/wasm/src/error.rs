@@ -32,6 +32,3 @@ pub enum Error {
     /// IncorrectCallInfo
     IncorrectCallInfo = 3,
 }
-
-
-

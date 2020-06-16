@@ -24,11 +24,13 @@ use log::trace;
 use wasmer_runtime::Func;
 
 use std::collections::{BTreeMap, HashMap, HashSet};
+use crate::vm::logic::ReturnData;
 
 //use self::api::ServiceApiBuilder;
 
 mod error;
 mod runtime_api;
+mod vm;
 pub mod service;
 
 #[doc(hidden)]
@@ -361,10 +363,22 @@ impl Runtime for WasmRuntime {
                 println!("Resetting counter");
                 let value = u64::from_bytes(payload.into())
                     .map_err(|e| Error::UnknownTransaction.with_description(e))?;
-                let instance = service.instantiate();
-                let add_one: Func<(u32, u32), u32> = instance.func("increment_counter").unwrap();
-                let result = add_one.call(value as u32, 10 as u32).unwrap();
-                println!("Host function exposed result {}", result);
+                //let instance = service.instantiate();
+                //let add_one: Func<(u32, u32), u32> = instance.func("increment_counter").unwrap();
+                //let result = add_one.call(value as u32, 10 as u32).unwrap();
+                let result = service.run(b"ext_read_vec").0;
+                match result {
+                    Some(v) => {
+                        if let ReturnData::Value(value) = v {
+                            //println!("Host function exposed result {}", value);
+                            dbg!(value);
+                        }
+                    },
+                    None => {
+                        println!("Service panicked")
+                    },
+                };
+
                 Ok(())
             }
 
